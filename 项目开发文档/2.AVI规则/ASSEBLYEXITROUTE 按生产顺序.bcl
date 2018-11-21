@@ -1,0 +1,196 @@
+Sub Main()
+    
+	Dim Allow(1 To 4) As Boolean  '第X道是否允许出车
+	Dim RoadPVI(1 To 4) As String	 '每道第一辆车条码，当前条码
+	Dim ROUTE_NUM,Road_Num(1 To 4) As  Integer
+	Dim modelss As Boolean
+
+	Dim LastRoute As Integer
+  	Dim NowBodyNo,LastBodyNo As Long
+	Dim LastBarCode As String
+    Dim asseblyNumbers As Integer
+	Dim asseblyNumSet As Integer
+
+
+
+
+
+	'PointSet "SERVER.ASSEBLYEXITPLANNODIFFER", 0  '复位故障	
+    
+  	LastRoute=PointGet("SERVER.TOCONV.LASTASSEBLYEXITROUTE")   
+	LastBarCode=PointGet("SERVER.FROMCONV.LASTASSEBLYEXITBARCODE")
+	sleep 1000
+	If 	Mid(LastBarcode,5,8)="" Then
+	LastBodyNo=0
+	Else
+   	LastBodyNo=clng(Mid(LastBarcode,5,8))
+	End If
+   '**********************获取每道第一辆车的信息*********************************	
+
+   If PointGet("A15.HMI.BARCODE")<>"" Then
+   RoadPVI(1)=PointGet("A15.HMI.BARCODE")
+   Road_Num(1)=1
+   Else
+   RoadPVI(1)=PointGet("AVI1314_15." & 1 & ".BARCODE")
+   End If
+
+   If PointGet("A16.HMI.BARCODE")<>"" Then
+   RoadPVI(2)=PointGet("A16.HMI.BARCODE")
+   Road_Num(2)=1
+   Else
+   RoadPVI(2)=PointGet("AVI12_16." & 1 & ".BARCODE")
+   End If
+
+   If PointGet("A17.HMI.BARCODE")<>"" Then
+   RoadPVI(3)=PointGet("A17.HMI.BARCODE")
+   Road_Num(3)=1
+   Else
+   RoadPVI(3)=PointGet("AVI12_17." & 1 & ".BARCODE")
+   End If
+
+   If PointGet("A18.HMI.BARCODE")<>"" Then
+   RoadPVI(4)=PointGet("A18.HMI.BARCODE")
+   Road_Num(4)=1
+   Else
+   RoadPVI(4)=PointGet("AVI12_18." & 1 & ".BARCODE")
+   End If
+	
+
+	'若空道则最后一辆条码为“NNNN”
+			    
+	Road_Num(1)=Road_Num(1)+PointGet("AVI1314_15.NUMS")
+    Road_Num(2)=Road_Num(2)+PointGet("AVI12_16.NUMS")
+    Road_Num(3)=Road_Num(3)+PointGet("AVI12_17.NUMS")
+    Road_Num(4)=Road_Num(4)+PointGet("AVI12_18.NUMS")
+
+	asseblyNumSet=PointGet("SERVER.ASSEBLYNUMSET")
+	asseblyNumbers=PointGet("SERVER.FROMCONV.ASSEBLYNUM")
+	If asseblyNumbers<=asseblyNumSet Then 'Or Road_Num(1)<=0 Or Road_Num(2)<=0 Or Road_Num(3)<=0 Or Road_Num(4)<=0    Then 
+	Exit Sub
+	End If 
+
+
+
+	If Road_Num(1)=0  Then RoadPVI(1)="NNNN"
+    If Road_Num(2)=0  Then RoadPVI(2)="NNNN"
+    If Road_Num(3)=0  Then RoadPVI(3)="NNNN"
+    If Road_Num(4)=0  Then RoadPVI(4)="NNNN"
+
+	'获取机运禁入禁出
+
+	     If  PointGet("SERVER.TOCONV.ASSEBLYEXTR1EN")=0 Then 
+	     Allow(1)=true
+		 Else
+		 Allow(1)=false
+		 End If
+
+	     If  PointGet("SERVER.TOCONV.ASSEBLYEXTR2EN")=0 Then 
+	     Allow(2)=true
+		 Else
+		 Allow(2)=false
+		 End If
+
+	     If  PointGet("SERVER.TOCONV.ASSEBLYEXTR3EN")=0 Then 
+	     Allow(3)=true
+		 Else
+		 Allow(3)=false
+		 End If
+
+	     If  PointGet("SERVER.TOCONV.ASSEBLYEXTR4EN")=0 Then 
+	     Allow(4)=true
+		 Else
+		 Allow(4)=false
+		 End If
+
+
+
+  '************************************************************
+   	
+ Dim strstationname(1 To 4) As String
+ strstationname(1)="AVI1314_15."
+ strstationname(2)="AVI12_16."
+ strstationname(3)="AVI12_17."
+ strstationname(4)="AVI12_18."
+
+
+
+ Dim orders(1 To 4),orderss As Double
+ Dim Roads(1 To 4) ,Roadss As Integer 
+ '8888=手动放车  9999=离线BYPASS 7777=空吊具
+ For i=1 To 4
+     If RoadPVI(i) <> "NNNN" And Len(RoadPVI(i)) = 28 And RoadPVI(i) <> "9999" Then
+           
+	 If Mid(RoadPVI(i),5,8)="" Then
+	 orders(i)=0
+	 Else
+	 orders(i)=clng(Mid(RoadPVI(i),5,8)) 
+	 End If           
+	 ElseIf  RoadPVI(i) = "8888" Or RoadPVI(i) = "9999" Or RoadPVI(i) = "NNNN" Or RoadPVI(i) = ""  Then
+
+	 orders(i)=999999999
+
+     End If
+ Next
+
+ '空撬先走
+   For i=1 To 4
+       If Allow(i)=true And (RoadPVI(i) = "7777" Or RoadPVI(i)="" Or Len(RoadPVI(i))<=4)   And RoadPVI(i) <> "NNNN" Then  
+	     PointSet "SERVER.TOCONV.ASSEBLYEXITROUTE", i
+         PointSet "SERVER.TOCONV.LASTASSEBLYEXITROUTE", i
+
+		 Exit Sub
+	   End If
+   Next i
+
+   
+
+  '正常车，非空橇
+		  For i=1 To 4
+		  Roads(i)=i
+		  Next i
+
+   '排序，找最小号车
+      For i=1 To 4
+	   For j=1 To 3
+		   If orders(j) > orders(j+1)  Then
+			   orderss=orders(j)
+			   orders(j)=orders(j+1)
+			   orders(j+1)=orderss
+
+			   Roadss= Roads(j)
+			   Roads(j)=Roads(j+1)
+			   Roads(j+1)= Roadss
+
+		   End If
+	   Next j
+   Next i
+
+   For i=1 To 4
+      If Allow(Roads(i))=true And Len(RoadPVI(Roads(i))) = 28 And RoadPVI(Roads(i)) <> "NNNN" Then  
+	    
+	      If 	Mid(RoadPVI(Roads(i)),5,8)="" Then
+	      NowBodyNo=0
+	      Else
+   	      NowBodyNo=clng(Mid(RoadPVI(Roads(i)),5,8))
+	      End If
+		
+		
+		If NowBodyNo= LastBodyNo+1  Then  '检查是否跟生产计划一致	
+		 PointSet "SERVER.TOCONV.ASSEBLYEXITROUTE",  Roads(i)
+	     PointSet "SERVER.TOCONV.LASTASSEBLYEXITROUTE",  Roads(i)
+		 PointSet "SERVER.TOCONV.ASSEBLYEXITBARCODE",  RoadPVI(Roads(i)) 	'给机运
+	    
+
+		 Else
+		 
+		  PointSet "SERVER.ASSEBLYEXITPLANNODIFFER", 1	
+		End If 
+
+		 Exit Sub
+	  End If
+   Next i
+
+
+
+
+End Sub

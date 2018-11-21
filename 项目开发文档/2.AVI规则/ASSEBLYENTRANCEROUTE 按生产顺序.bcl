@@ -1,0 +1,307 @@
+Sub Main()	 
+    
+	Dim Allow(1 To 3) As Boolean  '第x道是否允许出车
+	Dim IN_Car_PVI,RoadPVI(1 To 3) As String	 '每道最后一辆车条码，当前条码
+	Dim Road_Num(1 To 3) As Integer	  '最后一辆车的位置
+	Dim ROUTE_NUM As  Integer
+	Dim LastRoute As Integer
+
+	Dim LastBarCode As String
+  
+  
+  	LastRoute=PointGet("SERVER.TOCONV.LASTASSEBLYENTRANCEROUTE")
+
+	sleep 1000
+    Dim asseblyNumbers As Integer
+	Dim asseblyEXTNumSet As Integer
+
+
+	asseblyEXTNumSet=PointGet("SERVER.ASSEBLYEXTNUMSET")
+	asseblyNumbers=PointGet("SERVER.FROMCONV.ASSEBLYNUM")
+	If asseblyNumbers>asseblyEXTNumSet Then 
+	Exit Sub
+	End If 
+	
+
+
+   '**********************获取每道最后一辆车的位置*********************************	
+	
+    Road_Num(1)=PointGet("AVI12_16.NUMS")
+    Road_Num(2)=PointGet("AVI12_17.NUMS")
+    Road_Num(3)=PointGet("AVI12_18.NUMS")
+
+    If Road_Num(1)<>0 Then
+    RoadPVI(1)=PointGet("AVI12_16." & Road_Num(1) & ".BARCODE")
+	End If
+    If Road_Num(2)<>0 Then
+    RoadPVI(2)=PointGet("AVI12_17." & Road_Num(2) & ".BARCODE")
+	End If
+    If Road_Num(3)<>0 Then
+	RoadPVI(3)=PointGet("AVI12_18." & Road_Num(3) & ".BARCODE")
+	End If
+  '************************************************************
+ Dim orders(1 To 3) As Double
+ Dim order_IN,Nums(1 To 3),Nums1(1 To 3),Numss As Double
+ Dim Roads(1 To 3),Roadss As Integer
+
+ '初始化 禁入禁出\道满禁止
+
+
+	If Road_Num(1)=0  Then RoadPVI(1)="NNNN"
+    If Road_Num(2)=0  Then RoadPVI(2)="NNNN"
+    If Road_Num(3)=0  Then RoadPVI(3)="NNNN"
+
+	If Road_Num(1)>=23  Then RoadPVI(1)="FULL"
+    If Road_Num(2)>=24  Then RoadPVI(2)="FULL"
+    If Road_Num(3)>=25  Then RoadPVI(3)="FULL"
+
+	     If  PointGet("SERVER.TOCONV.ASSEBLYENTR2EN")=0 Then 
+	     Allow(1)=true
+		 Else
+		 Allow(1)=false
+		 End If
+
+	     If  PointGet("SERVER.TOCONV.ASSEBLYENTR3EN")=0 Then 
+	     Allow(2)=true
+		 Else
+		 Allow(2)=false
+		 End If
+
+	     If  PointGet("SERVER.TOCONV.ASSEBLYENTR4EN")=0 Then 
+	     Allow(3)=true
+		 Else
+		 Allow(3)=false
+		 End If
+
+
+
+	For i=1 To 3
+	If RoadPVI(i) = "FULL" Then
+    Allow(i)=false
+	End If
+	Next
+
+  '**********判断入口车是否为空撬，是否在计划表中***************
+
+	IN_Car_PVI=trim(PointGet("A12.HMI.BARCODE"))	    'A08.HMI.BARCODE   A08.HMI.BODYNO
+
+	'IN_Car_PVI="005900000099MF17000RAB101004"
+    '8888=手动放车  9999=离线BYPASS 7777=空吊具
+  If Len(IN_Car_PVI) = 28 And IN_Car_PVI <> "9999" And IN_Car_PVI <> "7777" Then
+	 GoTo Car_M
+  ElseIf IN_Car_PVI = "8888" Or IN_Car_PVI = "9999"  Or  IN_Car_PVI = "7777" Or  Len(IN_Car_PVI)=4  Then  
+     GoTo Skid_M
+  Else
+     Exit Sub
+  End If 
+  
+
+ Skid_M:
+	If lastroute=0 Then  lastroute=1
+	For i=1 To 3   '如果手动放车、BYPASS、空吊具的情况下，走上一辆车的路由
+		If Allow(i)=TRUE And lastroute=i+1 Then
+		   ROUTE_NUM=LastRoute-1
+           GoTo exit_M
+		End If
+		
+	Next
+
+
+
+ Car_M:	                       
+ '*****************入口为正常车时进入此模式，判断入口车是否为计划车
+  
+  If  IN_Car_PVI="" Or Len(IN_Car_PVI)=4 Then
+  order_IN=0
+  Else
+  order_IN=clng(Mid(IN_Car_PVI,5,8))
+  End If
+ 
+
+
+
+ 
+  '获取最后一辆车车身号  
+  If road_num(1)<>0 Then
+     If PointGet("AVI12_16." & Road_Num(1) & ".BODYNO" )="" Then
+	 orders(1)=0
+	 Else
+     orders(1)= clng(PointGet("AVI12_16." & Road_Num(1) & ".BODYNO" ))
+	 End If
+  End If
+ 
+  If road_num(2)<>0 Then 
+      If PointGet("AVI12_17." & Road_Num(2) & ".BODYNO")="" Then
+	  orders(2)=0
+	  Else 
+      orders(2)= clng(PointGet("AVI12_17." & Road_Num(2) & ".BODYNO"))
+	  End If
+  End If
+
+  If road_num(3)<>0 Then
+   If PointGet("AVI12_18." & Road_Num(3) & ".BODYNO")="" Then
+   orders(3)=0
+   Else
+   orders(3)= clng(PointGet("AVI12_18." & Road_Num(3) & ".BODYNO"))
+   End If
+  End If
+
+  '如果当前有车
+  If road_num(1)=0 Then  
+	If Len(PointGet("A16.HMI.BARCODE"))<=4 Then
+	orders(1)=0
+    End If
+	If Len(PointGet("A16.HMI.BARCODE"))=28 Then
+	orders(1)=Mid(PointGet("A16.HMI.BARCODE"),5,8)
+	End If
+  End If
+
+  If road_num(2)=0 Then  
+     
+	If Len(PointGet("A17.HMI.BARCODE"))<=4 Then
+	orders(2)=0
+    End If
+	  
+	If Len(PointGet("A17.HMI.BARCODE"))=28 Then
+	orders(2)=Mid(PointGet("A17.HMI.BARCODE"),5,8)
+	End If
+
+  End If
+
+  If road_num(3)=0 Then  
+     
+	If Len(PointGet("A18.HMI.BARCODE"))<=4 Then
+	orders(3)=0
+    End If
+	  
+	If Len(PointGet("A18.HMI.BARCODE"))=28 Then
+	orders(3)=Mid(PointGet("A18.HMI.BARCODE"),5,8) 
+	End If
+
+  End If
+
+  '如果发现昨天的车,禁止入内
+  If order_IN<orderS(1) And order_IN<orderS(2) And order_IN<orderS(3) Then
+  PointSet 	"SERVER.ASSEBLYNUMSET",0
+  Exit Sub
+  Else
+   If PointGet("SERVER.ASSEBLYNUMSET")=0 Then
+   PointSet "SERVER.ASSEBLYNUMSET",35
+   End If 
+  End If
+
+
+
+
+
+
+ '排序
+
+		 For i=1 To 3
+		 Nums(i)= order_IN - orders(i)
+         Nums1(i)=Nums(i)
+		 Roads(i)=i
+		 Next
+
+
+   For i=1 To 3
+	   For j=1 To 2
+		   If Nums(j) > Nums(j+1)  Then
+			   Numss=Nums(j)
+			   Nums(j)=Nums(j+1)
+			   Nums(j+1)=Numss
+
+			  Roadss= Roads(j)
+			   Roads(j)=Roads(j+1)
+			   Roads(j+1)= Roadss
+		   End If
+	   Next j
+   Next i
+
+
+ '假如入车顺序不一致，则优先找空道进,没有空道进入差值最小道
+
+  Dim findno As Boolean
+  findno=false
+  
+  For i=1 To 3
+     If order_IN = orders(i)+1  Then
+	 findno=true
+	 Exit For
+     End If
+  Next i
+
+ ' 如果没有符合条件的，从1-3顺序比较，进车 ，找空道进
+ If findno=false Then
+	For i=1 To 3
+		If Allow(i)=TRUE And RoadPVI(i)="NNNN" Then
+		   ROUTE_NUM=i
+           GoTo exit_M
+		End If
+   Next
+ End If
+
+ ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'全正数
+If Nums(1) >= 0 And 	Nums(2) >= 0 And Nums(3) >= 0  Then	'正常车 找最接近的车进
+
+   For i=1 To 3
+       If Allow(Roads(i))=true And Nums1(Roads(i))>=0  Then  
+	     ROUTE_NUM=  Roads(i)
+		 GoTo exit_M
+	   End If
+   Next i
+End If
+
+'有正有负，正优先
+
+If (Nums(1) >= 0  Or Nums(2) >= 0 Or Nums(3) >= 0) And (Nums(1) < 0  Or Nums(2) < 0 Or Nums(3) < 0)	Then	'有正有负，正优先
+   For i=1 To 3
+       If Allow(Roads(i))=true And Nums1(Roads(i))>0  Then  '有正有负，正优先
+	     ROUTE_NUM=  Roads(i)
+		 GoTo exit_M
+	   End If
+   Next i
+
+	For i=0 To 2
+       If Allow(Roads(3-i))=true And Nums1(Roads(3-i))<0 Then  '有正，正优先 (Nums 先最小的)
+		 ROUTE_NUM=  Roads(3-i)
+		 GoTo exit_M
+		 Exit Sub
+	   End If
+    Next i
+    
+	 
+End If 
+
+ '全负数情况
+
+If Nums(1) < 0 And 	Nums(2) < 0 And Nums(3) < 0  Then	'正常车 找最接近的车进
+   For i=0 To 2
+       If Allow(Roads(3-i))=true Then	   'nums最大的优先
+	     ROUTE_NUM= Roads(3-i)
+		 GoTo exit_M
+		End If
+   Next i
+End If 
+
+
+
+
+ exit_M:
+	  Select Case(ROUTE_NUM)
+	   Case 1
+	      PointSet 	"SERVER.TOCONV.ASSEBLYENTRANCEROUTE",2		
+	      PointSet 	"SERVER.TOCONV.LASTASSEBLYENTRANCEROUTE",2
+		  Exit Sub
+	   Case 2
+	      PointSet 	"SERVER.TOCONV.ASSEBLYENTRANCEROUTE",3
+	      PointSet 	"SERVER.TOCONV.LASTASSEBLYENTRANCEROUTE",3
+		  Exit Sub
+	   Case 3
+	      PointSet 	"SERVER.TOCONV.ASSEBLYENTRANCEROUTE",4
+	      PointSet 	"SERVER.TOCONV.LASTASSEBLYENTRANCEROUTE",4
+		  Exit Sub
+	  End Select
+
+End Sub
